@@ -1,4 +1,6 @@
 export default async function ({ addon, console, msg }) {
+  const vm = addon.tab.traps.vm;
+  
   const controlsContainer = await addon.tab.waitForElement(
     "[class*='controls_controls-container']",
     {
@@ -38,23 +40,21 @@ export default async function ({ addon, console, msg }) {
     sliderContainer.appendChild(valueDisplay);
   }
 
-  controlsContainer.insertBefore(sliderContainer, controlsContainer.firstChild);
+  controlsContainer.appendChild(sliderContainer);
 
-  let originalStepTime = null;
+  let currentSpeed = 1;
+
+  const originalStepThreads = vm.runtime.sequencer.stepThreads;
+  vm.runtime.sequencer.stepThreads = function () {
+    const stepsToRun = Math.max(1, Math.round(currentSpeed));
+    for (let i = 0; i < stepsToRun; i++) {
+      originalStepThreads.call(this);
+    }
+  };
 
   function setSpeed(speedPercent) {
-    const vm = addon.tab.traps.vm;
-    if (!vm || !vm.runtime) return;
-
-    const speedMultiplier = speedPercent / 100;
-
-    if (originalStepTime === null && vm.runtime.currentStepTime) {
-      originalStepTime = vm.runtime.currentStepTime;
-    }
-
-    vm.runtime.currentStepTime = (originalStepTime || 1) / speedMultiplier;
-
-    console.log(`Speed set to ${speedPercent}% (${speedMultiplier}x)`);
+    currentSpeed = speedPercent / 100;
+    console.log(`Speed set to ${speedPercent}% (${currentSpeed}x)`);
   }
 
   slider.addEventListener("input", (e) => {
