@@ -43,17 +43,77 @@ export default async function ({ addon, console, msg }) {
   controlsContainer.appendChild(sliderContainer);
 
   let currentSpeed = 1;
+  let accumulatedTime = 0;
+  const normalStepTime = 1000 / 30;
 
   const originalStepThreads = vm.runtime.sequencer.stepThreads;
+  let lastStepTime = performance.now();
+
   vm.runtime.sequencer.stepThreads = function () {
-    const stepsToRun = Math.max(1, Math.round(currentSpeed));
-    for (let i = 0; i < stepsToRun; i++) {
-      originalStepThreads.call(this);
+    const now = performance.now();
+    const deltaTime = now - lastStepTime;
+    lastStepTime = now;
+
+    accumulatedTime += deltaTime * currentSpeed;
+
+    let stepsToRun = 0;
+    while (accumulatedTime >= normalStepTime) {
+      stepsToRun++;
+      accumulatedTime -= normalStepTime;
+    }
+
+    if (stepsToRun > 0) {
+      for (let i = 0; i < stepsToRun; i++) {
+        originalStepThreads.call(this);
+      }
     }
   };
 
+  const originalCreatePlayer = vm.runtime.audioEngine.createPlayer.bind(vm.runtime.audioEngine);
+  vm.runtime.audioEngine.createPlayer = function() {
+    const player = originalCreatePlayer();
+    if (player && player.outputNode) {
+      const origConnect = player.outputNode.connect.bind(player.outputNode);
+      player.outputNode.connect = function(destination) {
+        // Set playback rate based on current speed
+        if (this.playbackRate) {
+          this.playbackRate.value = currentSpeed;
+        }
+        return origConnect(destination);
+      };
+    }
+    return player;
+  };
+
+  function updateSoundSpeed() {
+    if (vm.runtime.targets) {
+      for (const target of vm.runtime.targets) {
+        if (target.sprite && target.sprite.soundBank) {
+          const soundBank = target.sprite.soundBank;
+          if (soundBank.playerTargets) {
+            for (const playerId in soundBank.playerTargets) {
+              const player = soundBank.playerTargets[playerId];
+              if (player && player.outputNode && player.outputNode.playbackRate) {
+                player.outputNode.playbackRate.value = currentSpeed;
+              }
+            }
+          }
+          if (soundBank.soundPlayers) {
+            for (const playerId in soundBank.soundPlayers) {
+              const player = soundBank.soundPlayers[playerId];
+              if (player && player.outputNode && player.outputNode.playbackRate) {
+                player.outputNode.playbackRate.value = currentSpeed;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
   function setSpeed(speedPercent) {
     currentSpeed = speedPercent / 100;
+    updateSoundSpeed();
     console.log(`Speed set to ${speedPercent}% (${currentSpeed}x)`);
   }
 
@@ -96,7 +156,7 @@ export default async function ({ addon, console, msg }) {
     if (!document.querySelector(".sa-speed-slider-container")) {
       const newControlsContainer = document.querySelector("[class*='controls_controls-container']");
       if (newControlsContainer) {
-        newControlsContainer.insertBefore(sliderContainer, newControlsContainer.firstChild);
+        newControlsContainer.appendChild(sliderContainer);
       }
     }
   }
