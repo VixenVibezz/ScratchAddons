@@ -13,7 +13,7 @@ export default async function ({ addon, console, msg }) {
   );
 
   const sliderContainer = document.createElement("div");
-  sliderContainer.className = addon.tab.scratchClass("controls_controls-container") + " sa-speed-slider-container";
+  sliderContainer.className = "sa-speed-slider-container";
 
   const label = document.createElement("span");
   label.className = "sa-speed-label";
@@ -26,8 +26,8 @@ export default async function ({ addon, console, msg }) {
   slider.value = "100";
   slider.step = "10";
   slider.className = "sa-speed-slider";
-
-  let valueDisplay;
+  
+  let valueDisplay = null;
   if (addon.settings.get("showPercentage")) {
     valueDisplay = document.createElement("span");
     valueDisplay.className = "sa-speed-value";
@@ -43,78 +43,33 @@ export default async function ({ addon, console, msg }) {
   controlsContainer.appendChild(sliderContainer);
 
   let currentSpeed = 1;
-  let accumulatedTime = 0;
-  const normalStepTime = 1000 / 30;
 
-  const originalStepThreads = vm.runtime.sequencer.stepThreads;
-  let lastStepTime = performance.now();
-
+  const originalStepThreads = vm.runtime.sequencer.stepThreads.bind(vm.runtime.sequencer);
+  
   vm.runtime.sequencer.stepThreads = function () {
-    const now = performance.now();
-    const deltaTime = now - lastStepTime;
-    lastStepTime = now;
-
-    accumulatedTime += deltaTime * currentSpeed;
-
-    let stepsToRun = 0;
-    while (accumulatedTime >= normalStepTime) {
-      stepsToRun++;
-      accumulatedTime -= normalStepTime;
-    }
-
-    if (stepsToRun > 0) {
-      for (let i = 0; i < stepsToRun; i++) {
-        originalStepThreads.call(this);
+    const speed = currentSpeed;
+    
+    if (speed >= 1) {
+      const steps = Math.floor(speed);
+      const fraction = speed - steps;
+      
+      for (let i = 0; i < steps; i++) {
+        originalStepThreads();
+      }
+      
+      if (fraction > 0 && Math.random() < fraction) {
+        originalStepThreads();
+      }
+    } else {
+      if (Math.random() < speed) {
+        originalStepThreads();
       }
     }
   };
-
-  const originalCreatePlayer = vm.runtime.audioEngine.createPlayer.bind(vm.runtime.audioEngine);
-  vm.runtime.audioEngine.createPlayer = function() {
-    const player = originalCreatePlayer();
-    if (player && player.outputNode) {
-      const origConnect = player.outputNode.connect.bind(player.outputNode);
-      player.outputNode.connect = function(destination) {
-        // Set playback rate based on current speed
-        if (this.playbackRate) {
-          this.playbackRate.value = currentSpeed;
-        }
-        return origConnect(destination);
-      };
-    }
-    return player;
-  };
-
-  function updateSoundSpeed() {
-    if (vm.runtime.targets) {
-      for (const target of vm.runtime.targets) {
-        if (target.sprite && target.sprite.soundBank) {
-          const soundBank = target.sprite.soundBank;
-          if (soundBank.playerTargets) {
-            for (const playerId in soundBank.playerTargets) {
-              const player = soundBank.playerTargets[playerId];
-              if (player && player.outputNode && player.outputNode.playbackRate) {
-                player.outputNode.playbackRate.value = currentSpeed;
-              }
-            }
-          }
-          if (soundBank.soundPlayers) {
-            for (const playerId in soundBank.soundPlayers) {
-              const player = soundBank.soundPlayers[playerId];
-              if (player && player.outputNode && player.outputNode.playbackRate) {
-                player.outputNode.playbackRate.value = currentSpeed;
-              }
-            }
-          }
-        }
-      }
-    }
-  }
 
   function setSpeed(speedPercent) {
     currentSpeed = speedPercent / 100;
-    updateSoundSpeed();
-    console.log(`Speed set to ${speedPercent}% (${currentSpeed}x)`);
+    console.log(`Execution speed set to ${speedPercent}% (${currentSpeed}x)`);
   }
 
   slider.addEventListener("input", (e) => {
@@ -137,12 +92,14 @@ export default async function ({ addon, console, msg }) {
         sliderContainer.appendChild(valueDisplay);
       }
     } else {
-      if (valueDisplay) {
+      if (valueDisplay && valueDisplay.parentNode) {
         valueDisplay.remove();
         valueDisplay = null;
       }
     }
   });
+
+  setSpeed(100);
 
   while (true) {
     await addon.tab.waitForElement("[class*='controls_controls-container']", {
