@@ -26,7 +26,7 @@ export default async function ({ addon, console, msg }) {
   slider.value = "100";
   slider.step = "10";
   slider.className = "sa-speed-slider";
-  
+
   let valueDisplay = null;
   if (addon.settings.get("showPercentage")) {
     valueDisplay = document.createElement("span");
@@ -43,6 +43,7 @@ export default async function ({ addon, console, msg }) {
   controlsContainer.appendChild(sliderContainer);
 
   let currentSpeed = 1;
+  let frameCounter = 0;
 
   const originalStepThreads = vm.runtime.sequencer.stepThreads.bind(vm.runtime.sequencer);
   
@@ -50,25 +51,52 @@ export default async function ({ addon, console, msg }) {
     const speed = currentSpeed;
     
     if (speed >= 1) {
-      const steps = Math.floor(speed);
-      const fraction = speed - steps;
-      
-      for (let i = 0; i < steps; i++) {
+      const stepsToRun = Math.floor(speed);
+      for (let i = 0; i < stepsToRun; i++) {
         originalStepThreads();
       }
-      
-      if (fraction > 0 && Math.random() < fraction) {
+    } else if (speed > 0) {
+      frameCounter++;
+      const frameInterval = Math.round(1 / speed);
+      if (frameCounter >= frameInterval) {
         originalStepThreads();
+        frameCounter = 0;
       }
     } else {
-      if (Math.random() < speed) {
-        originalStepThreads();
-      }
+      originalStepThreads();
     }
   };
 
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (vm.runtime.audioEngine && vm.runtime.audioEngine.audioContext) {
+    const originalCreateBufferSource = vm.runtime.audioEngine.audioContext.createBufferSource.bind(
+      vm.runtime.audioEngine.audioContext
+    );
+    
+    vm.runtime.audioEngine.audioContext.createBufferSource = function () {
+      const source = originalCreateBufferSource();
+      const originalStart = source.start ? source.start.bind(source) : source.noteOn.bind(source);
+      
+      const startWrapper = function (...args) {
+        if (source.playbackRate) {
+          source.playbackRate.value = currentSpeed;
+        }
+        return originalStart(...args);
+      };
+      
+      if (source.start) {
+        source.start = startWrapper;
+      } else {
+        source.noteOn = startWrapper;
+      }
+      
+      return source;
+    };
+  }
+
   function setSpeed(speedPercent) {
     currentSpeed = speedPercent / 100;
+    frameCounter = 0;
     console.log(`Execution speed set to ${speedPercent}% (${currentSpeed}x)`);
   }
 
