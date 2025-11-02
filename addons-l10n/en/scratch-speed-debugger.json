@@ -1,0 +1,8 @@
+{
+  "scratch-speed-debugger/@name": "Scratch Speed Debugger",
+  "scratch-speed-debugger/@description": "Adds a speed slider above the project stage to control playback speed from 10% to 300%.",
+  "scratch-speed-debugger/speed": "Speed:",
+  "scratch-speed-debugger/@settings-name-minSpeed": "Minimum speed (%)",
+  "scratch-speed-debugger/@settings-name-maxSpeed": "Maximum speed (%)",
+  "scratch-speed-debugger/@settings-name-showPercentage": "Show speed percentage"
+}
