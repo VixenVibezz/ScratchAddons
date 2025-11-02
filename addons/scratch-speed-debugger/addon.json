@@ -1,0 +1,51 @@
+{
+  "name": "Scratch Speed Debugger",
+  "description": "Adds a speed slider above the project stage to control playback speed from 10% to 300%.",
+  "tags": ["editor", "featured"],
+  "credits": [
+    {
+      "name": "Peanut_Butter5647",
+      "link": "https://scratch.mit.edu/users/Peanut_Butter5647/"
+    }
+  ],
+  "enabledByDefault": false,
+  "userscripts": [
+    {
+      "url": "userscript.js",
+      "matches": ["projects"]
+    }
+  ],
+  "userstyles": [
+    {
+      "url": "style.css",
+      "matches": ["projects"]
+    }
+  ],
+  "settings": [
+    {
+      "name": "Min speed",
+      "id": "minSpeed",
+      "type": "integer",
+      "default": 10,
+      "min": 1,
+      "max": 100
+    },
+    {
+      "name": "Max speed",
+      "id": "maxSpeed",
+      "type": "integer",
+      "default": 300,
+      "min": 100,
+      "max": 500
+    },
+    {
+      "name": "Show speed percentage",
+      "id": "showPercentage",
+      "type": "boolean",
+      "default": true
+    }
+  ],
+  "dynamicEnable": true,
+  "dynamicDisable": true,
+  "versionAdded": "v1.38.0"
+}
